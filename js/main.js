@@ -47,6 +47,9 @@ class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
 
   preload() {
+    this.load.on('loaderror', (f) => { if (window.__log) window.__log('404: ' + (f && f.src || '?')); });
+    this.load.on('complete', () => { if (window.__log) window.__log('preload complete'); });
+    if (window.__log) window.__log('preload() start');
     this.load.image('bg_new',    'assets/bg_new.jpg');
     this.load.image('bg_temple2', 'assets/bg_temple2.jpg');
     this.load.image('bg_cave', 'assets/bg_cave.jpg');
@@ -69,6 +72,7 @@ class BootScene extends Phaser.Scene {
   }
 
   create() {
+    if (window.__log) window.__log('BootScene.create (fallback)');
     this.makeFx();
     this.scene.start('Game');
   }
@@ -1514,6 +1518,7 @@ class GameScene extends Phaser.Scene {
 }
 
 /* ========================================================================= */
+if (window.__log) window.__log('creating Phaser.Game');
 new Phaser.Game({
   type: Phaser.AUTO,
   width: W,
