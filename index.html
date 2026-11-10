@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="x5-orientation" content="landscape" />
+<meta name="screen-orientation" content="landscape" />
+<meta name="theme-color" content="#0b1220" />
+<title>尸语 · 七魔逐道</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #05080f; overflow: hidden; height: 100%; }
+  #game { width: 100vw; height: 100vh; }
+  canvas { display: block; }
+  #hint {
+    position: fixed; left: 0; right: 0; bottom: 6px; text-align: center;
+    color: #6a7a90; font: 12px/1.6 system-ui, "Microsoft YaHei", sans-serif;
+    pointer-events: none; user-select: none;
+  }
+  @media (max-width: 700px) { #hint { display: none; } }
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hint">A / D 移动　K 跳跃　J 攻击　1-4 换武器　P 暂停</div>
+<div id="errbox" style="position:fixed;left:0;top:0;right:0;z-index:9999;background:#300;color:#f88;
+  font:14px/1.5 monospace;padding:8px;white-space:pre-wrap;display:none;"></div>
+<script>
+window.onerror = function(msg, src, line, col, err) {
+  var d = document.getElementById('errbox');
+  d.style.display = 'block';
+  d.textContent += msg + "\n  at " + (src||'').split('/').pop() + ":" + line + ":" + col + "\n";
+  document.title = 'ERR: ' + msg;
+};
+</script>
+<script src="./js/phaser.min.js"></script>
+<script>
+// 缓存破坏：给 main.js 加时间戳，保证每次都加载最新代码
+document.write('<script src="./js/main.js?v=' + Date.now() + '"><\/script>');
+</script>
+</body>
+</html>
