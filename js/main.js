@@ -41,6 +41,8 @@ const WEAPONS = [
 /* =========================================================================
    Boot：加载图片 + 程序生成矢量贴图
    ========================================================================= */
+if (window.__log) window.__log('main.js loaded');
+
 class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
 
@@ -364,6 +366,7 @@ class GameScene extends Phaser.Scene {
   }
 
   create() {
+    if (window.__log) window.__log('GameScene.create L=' + (this.level||1));
     this.level = this.level || 1;
     this.cfg = LEVELS[this.level - 1] || LEVELS[0];
     this.phase = 'play';
