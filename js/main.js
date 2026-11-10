@@ -68,7 +68,12 @@ class BootScene extends Phaser.Scene {
     setTimeout(() => {
       if (!finished) {
         if (window.__log) window.__log('preload TIMEOUT -> force start');
-        try { this.scene.start('Game'); } catch (e) {}
+        try {
+          this.makeFx();            // 程序生成的贴图先补上
+          this.scene.start('Game');
+        } catch (e) {
+          if (window.__log) window.__log('force start 失败: ' + e.message);
+        }
       }
     }, 12000);
     this.load.image('bg_cave', 'assets/bg_cave.jpg');
