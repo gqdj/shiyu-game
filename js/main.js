@@ -50,18 +50,33 @@ class BootScene extends Phaser.Scene {
     this.load.on('loaderror', (f) => { if (window.__log) window.__log('404: ' + (f && f.src || '?')); });
     this.load.on('complete', () => { if (window.__log) window.__log('preload complete'); });
     if (window.__log) window.__log('preload() start');
-    this.load.image('bg_new',    'assets/bg_new.jpg');
-    this.load.image('bg_temple2', 'assets/bg_temple2.jpg');
+
+    // 每个文件加载完成都记一笔，方便定位卡在哪个文件
+    this.load.on('filecomplete', (key) => {
+      if (window.__log) window.__log('ok ' + key);
+    });
+    this.load.on('progress', (v) => {
+      if (window.__log && (v >= 0.99 || Math.round(v * 4) !== Math.round((this.__lastP || 0) * 4))) {
+        window.__log('progress ' + Math.round(v * 100) + '%');
+        this.__lastP = v;
+      }
+    });
+
+    // 兜底：12 秒还没加载完，直接进游戏（缺贴图也比黑屏强）
+    let finished = false;
+    this.load.on('complete', () => { finished = true; });
+    setTimeout(() => {
+      if (!finished) {
+        if (window.__log) window.__log('preload TIMEOUT -> force start');
+        try { this.scene.start('Game'); } catch (e) {}
+      }
+    }, 12000);
     this.load.image('bg_cave', 'assets/bg_cave.jpg');
     this.load.image('reward_l1', 'assets/reward_l1.png');
     this.load.image('bg_forest', 'assets/bg_forest.jpg');
     this.load.image('boss2', 'assets/boss2.webp');
     this.load.image('spr_otter', 'assets/spr_otter.png');
     this.load.image('spr_hero',  'assets/spr_hero.png');
-    this.load.image('spr_hero_run', 'assets/spr_hero_run.png');
-    this.load.image('spr_run',  'assets/spr_run.png');
-    this.load.image('spr_atk',  'assets/spr_atk.png');
-    this.load.image('spr_jump', 'assets/spr_jump.png');
     for (let i = 0; i < 8; i++) this.load.image('spr_walk' + i, 'assets/spr_walk' + i + '.png');
     this.load.image('spr_idle', 'assets/spr_idle.png');
     this.load.image('spr_atk2', 'assets/spr_atk2.png');
@@ -363,10 +378,23 @@ class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
 
   init(data) {
-    // 支持 ?level=2 直接进入第二关（方便测试）
-    let urlLevel = 1;
-    try { urlLevel = parseInt(new URLSearchParams(location.search).get('level') || '1', 10) || 1; } catch (e) {}
-    this.level = (data && data.level) || urlLevel;
+    // URL 参数只生效一次，随后立刻从地址栏清除。
+    // 否则每次 restart 会重新触发（?win=1 会让结算界面无限重现）
+    if (!this.__qp) {
+      const q = { level: 1, auto: false, boss: false, win: false };
+      try {
+        const sp = new URLSearchParams(location.search);
+        q.level = parseInt(sp.get('level') || '1', 10) || 1;
+        q.auto = sp.get('auto') === '1';
+        q.boss = sp.get('boss') === '1';
+        q.win  = sp.get('win')  === '1';
+        const u = new URL(location.href);
+        ['level', 'auto', 'boss', 'win'].forEach(k => u.searchParams.delete(k));
+        history.replaceState(null, '', u.toString());
+      } catch (e) {}
+      this.__qp = q;
+    }
+    this.level = (data && data.level) || this.__qp.level || 1;
   }
 
   create() {
@@ -383,6 +411,7 @@ class GameScene extends Phaser.Scene {
     this.flags = { ghostWave: false, mixedWave: false };
     this.camL = 0;
 
+    this.physics.world.resume();   // 确保重启后物理不被暂停
     this.physics.world.setBounds(0, 0, WORLD_W, H);
     this.cameras.main.setBounds(0, 0, WORLD_W, H);
 
@@ -399,18 +428,11 @@ class GameScene extends Phaser.Scene {
     this.buildSkills();
     this.buildTouch();
     this.buildKeys();
-    let auto = false;
-    try { auto = new URLSearchParams(location.search).get('auto') === '1'; } catch (e) {}
-    if (auto) { this.phase = 'play'; } else { this.showTitle(); }
+    if (this.__qp.auto) { this.phase = 'play'; } else { this.showTitle(); }
 
-    // ?boss=1 直接到 Boss 战场（测试用）
-    let toBoss = false;
-    try { toBoss = new URLSearchParams(location.search).get('boss') === '1'; } catch (e) {}
-    let toWin = false;
-    try { toWin = new URLSearchParams(location.search).get('win') === '1'; } catch (e) {}
-    if (toWin) { this.time.delayedCall(600, () => this.showWin()); }
+    if (this.__qp.win) { this.time.delayedCall(600, () => this.showWin()); }
 
-    if (toBoss && this.player) {
+    if (this.__qp.boss && this.player) {
       this.player.x = ARENA_L + 120;
       this.cameras.main.scrollX = ARENA_L - 200;
     }
@@ -1490,23 +1512,42 @@ class GameScene extends Phaser.Scene {
     ov.add(viewBtn);
     viewBtn.on('pointerdown', () => window.open('assets/reward_l1.png', '_blank'));
 
-    // 进入第二关 / 结束
+    // 进入第二关：矩形热区（比文字热区可靠）
     if (this.level === 1) {
-      const next = this.add.text(W / 2 + 70, 656, '进入第二关 →', {
-        fontFamily: 'Microsoft YaHei', fontSize: '24px', color: '#0b1220',
-        backgroundColor: '#6fd3a8', padding: { x: 20, y: 10 }
-      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-      ov.add(next);
-      next.on('pointerdown', () => this.scene.restart({ level: 2 }));
+      const bx = W / 2 + 70, by = 656;
+      const zone = this.add.rectangle(bx, by, 250, 52, 0x6fd3a8)
+        .setOrigin(0.5).setInteractive({ useHandCursor: true });
+      const label = this.add.text(bx, by, '进入第二关 →', {
+        fontFamily: 'Microsoft YaHei', fontSize: '24px', color: '#0b1220'
+      }).setOrigin(0.5);
+      ov.add([zone, label]);
+      const go = () => {
+        if (this.__going) return;
+        this.__going = true;
+        label.setText('载入第二关…');
+        if (window.__log) window.__log('click next -> level 2');
+        try {
+          this.scene.restart({ level: 2 });
+        } catch (e) {
+          if (window.__log) window.__log('restart 失败: ' + e.message);
+        }
+      };
+      zone.on('pointerdown', go);
+      zone.on('pointerover', () => zone.setFillStyle(0x9ff0c8));
+      zone.on('pointerout', () => zone.setFillStyle(0x6fd3a8));
+      this.input.keyboard.once('keydown-ENTER', go);
+      this.input.keyboard.once('keydown-SPACE', go);
     }
 
     // 重来
-    const again = this.add.text(this.level === 1 ? W / 2 + 260 : W / 2 + 120, 656, '再玩一次', {
-      fontFamily: 'Microsoft YaHei', fontSize: '24px', color: '#8fb6d8',
-      backgroundColor: '#12203180', padding: { x: 22, y: 10 }
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    ov.add(again);
-    again.on('pointerdown', () => this.scene.restart());
+    const ax = this.level === 1 ? W / 2 + 330 : W / 2 + 120;
+    const againZone = this.add.rectangle(ax, 656, 180, 52, 0x122031).setOrigin(0.5)
+      .setStrokeStyle(2, 0x2f4a66).setInteractive({ useHandCursor: true });
+    const again = this.add.text(ax, 656, '再玩一次', {
+      fontFamily: 'Microsoft YaHei', fontSize: '22px', color: '#8fb6d8'
+    }).setOrigin(0.5);
+    ov.add([againZone, again]);
+    againZone.on('pointerdown', () => this.scene.restart({ level: this.level }));
 
     ov.add(this.add.text(W / 2, 736, '按 R 也可重来', {
       fontFamily: 'Microsoft YaHei', fontSize: '16px', color: '#6a7a90'
