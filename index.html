@@ -24,6 +24,19 @@
 <div id="hint">A / D 移动　K 跳跃　J 攻击　1-4 换武器　P 暂停</div>
 <div id="errbox" style="position:fixed;left:0;top:0;right:0;z-index:9999;background:#300;color:#f88;
   font:14px/1.5 monospace;padding:8px;white-space:pre-wrap;display:none;"></div>
+<div id="bootlog" style="position:fixed;left:8px;bottom:8px;z-index:9998;color:#22ff88;
+  font:12px/1.5 monospace;text-shadow:0 0 3px #000;pointer-events:none;white-space:pre-wrap;"></div>
+<script>
+window.__log = function (m) {
+  var d = document.getElementById('bootlog');
+  if (d) d.textContent += m + "\n";
+};
+window.__log('html ok');
+window.addEventListener('unhandledrejection', function (e) {
+  var r = e.reason;
+  window.__log('REJECT: ' + ((r && r.message) || r));
+});
+</script>
 <script>
 window.onerror = function(msg, src, line, col, err) {
   var d = document.getElementById('errbox');
